@@ -2,6 +2,7 @@ package org.rdlinux.loadbalancer.autoconfigure;
 
 import org.rdlinux.loadbalancer.RegionZoneAwareServiceInstanceListSupplier;
 import org.rdlinux.loadbalancer.filter.RegionZoneFilter;
+import org.rdlinux.loadbalancer.filter.RegionZoneWebFilter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -22,7 +23,9 @@ import org.springframework.core.env.Environment;
  * <p>
  * 功能:
  * 1. 配置基于区域和机房感知的负载均衡策略
- * 2. 注册 RegionZoneFilter 支持动态负载均衡
+ * 2. 根据应用类型注册对应的 Filter 支持动态负载均衡
+ * - Servlet 应用: 注册 RegionZoneFilter
+ * - Reactive 应用(如 Gateway): 注册 RegionZoneWebFilter
  * <p>
  * 负载均衡策略:
  * 1. 使用 RegionZoneAwareServiceInstanceListSupplier 过滤服务实例
@@ -70,9 +73,9 @@ public class EzLoadBalancerAutoConfiguration {
     }
 
     /**
-     * 注册 RegionZoneFilter
+     * 注册 RegionZoneFilter (Servlet 版本)
      * <p>
-     * 只在 Web 应用中启用
+     * 只在 Servlet Web 应用中启用
      * 从 HTTP 请求头中读取区域和机房信息,支持动态负载均衡
      * <p>
      * 优先级设置为 Integer.MIN_VALUE + 6,确保在链路追踪之后执行
@@ -92,5 +95,21 @@ public class EzLoadBalancerAutoConfiguration {
         // 在本拦截器的前面执行, 方便初始化链路追踪信息
         registration.setOrder(Integer.MIN_VALUE + 6);
         return registration;
+    }
+
+    /**
+     * 注册 RegionZoneWebFilter (WebFlux 版本)
+     * <p>
+     * 只在 Reactive Web 应用中启用 (如 Spring Cloud Gateway)
+     * 从 HTTP 请求头中读取区域和机房信息,支持动态负载均衡
+     * <p>
+     * 执行顺序通过 Ordered 接口指定为 Integer.MIN_VALUE + 6,确保在链路追踪之后执行
+     *
+     * @return RegionZoneWebFilter
+     */
+    @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
+    public RegionZoneWebFilter regionZoneWebFilter() {
+        return new RegionZoneWebFilter();
     }
 }
